@@ -149,10 +149,10 @@ fn inv_shiftrows (xs : Block) -> Block {
  */
  
 fn mixcolumns_step ([s0, s1, s2, s3] : Word) -> Word {
-  let t0 = mul_bytes(0x02, s0) ^ mul_bytes(0x03, s1) ^ s2 ^ s3;
-  let t1 = s0 ^ mul_bytes(0x02, s1) ^ mul_bytes(0x03, s2) ^ s3;
-  let t2 = s0 ^ s1 ^ mul_bytes(0x02, s2) ^ mul_bytes(0x03, s3);
-  let t3 = mul_bytes(0x03, s0) ^ s1 ^ s2 ^ mul_bytes(0x02, s3);
+  let t0 = mul_bytes(0x02, s0) ^ mul_bytes(0x03, s1) ^ s2                  ^ s3;
+  let t1 = s0                  ^ mul_bytes(0x02, s1) ^ mul_bytes(0x03, s2) ^ s3;
+  let t2 = s0                  ^ s1                  ^ mul_bytes(0x02, s2) ^ mul_bytes(0x03, s3);
+  let t3 = mul_bytes(0x03, s0) ^ s1                  ^ s2                  ^ mul_bytes(0x02, s3);
   return [t0, t1, t2, t3];
 }
 
@@ -190,6 +190,29 @@ fn inv_mixcolumns ([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, 
   let [t8 , t9 , t10, t11] = inv_mixcolumns_step([s8 , s9 , s10, s11]);
   let [t12, t13, t14, t15] = inv_mixcolumns_step([s12, s13, s14, s15]);
   return [t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15];
+}
+
+/**
+ * Performs one round of AES encryption [FIPS-PUB-197], Section 5.1.
+ */
+
+fn round (mut xs : Block, ki : Block) -> Block {
+  xs = mixcolumns(shiftrows(subbytes(xs)));
+  for i in 0..=15 {
+    xs[i] = xs[i] ^ ki[i];
+  }
+  return xs;
+}
+
+/**
+ * Performs one round of AES decryption [FIPS-PUB-197], Section 5.3.
+ */
+
+fn inv_round (mut xs : Block, ki : Block) -> Block {
+  for i in 0..=15 {
+    xs[i] = xs[i] ^ ki[i];
+  }
+  return inv_subbytes(inv_shiftrows(inv_mixcolumns(xs)));
 }
 
 #[cfg(test)]
@@ -255,6 +278,19 @@ mod aes_tests {
     for _i in 0..=127 {  // Run 128 random tests of 2^^128 possible tests
       let xs : Block = rand::random(); 
       assert_eq!(inv_mixcolumns(mixcolumns(xs)), xs);
+    }
+  }
+
+  /**
+   * Property demonstrating that Round and InvRound are inverses.
+   */
+
+  #[test]
+  fn round_inverts() {
+    for _i in 0..=127 {  // Run 128 random tests of 2^^256 possible tests
+      let xs : Block = rand::random();
+      let ki : Block = rand::random(); 
+      assert_eq!(inv_round(round(xs, ki), ki), xs);
     }
   }
 
