@@ -144,6 +144,53 @@ fn inv_shiftrows (xs : Block) -> Block {
   return ret;
 }
 
+/**
+ * One step of MixColumns [FIPS-PUB-197], Section 5.1.3.
+ */
+ 
+fn mixcolumns_step ([s0, s1, s2, s3] : Word) -> Word {
+  let t0 = mul_bytes(0x02, s0) ^ mul_bytes(0x03, s1) ^ s2 ^ s3;
+  let t1 = s0 ^ mul_bytes(0x02, s1) ^ mul_bytes(0x03, s2) ^ s3;
+  let t2 = s0 ^ s1 ^ mul_bytes(0x02, s2) ^ mul_bytes(0x03, s3);
+  let t3 = mul_bytes(0x03, s0) ^ s1 ^ s2 ^ mul_bytes(0x02, s3);
+  return [t0, t1, t2, t3];
+}
+
+/**
+ * MixColumns transformation [FIPS-PUB-197], Section 5.1.3.
+ */
+
+fn mixcolumns ([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15] : Block) -> Block {
+  let [t0 , t1 , t2 , t3 ] = mixcolumns_step([s0 , s1 , s2 , s3 ]);
+  let [t4 , t5 , t6 , t7 ] = mixcolumns_step([s4 , s5 , s6 , s7 ]);
+  let [t8 , t9 , t10, t11] = mixcolumns_step([s8 , s9 , s10, s11]);
+  let [t12, t13, t14, t15] = mixcolumns_step([s12, s13, s14, s15]);
+  return [t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15];
+}
+
+/**
+ * One step of InvMixColumns [FIPS-PUB-197], Section 5.3.3.
+ */
+
+fn inv_mixcolumns_step ([s0, s1, s2, s3] : Word) -> Word {
+  let t0 = mul_bytes(0x0e, s0) ^ mul_bytes(0x0b, s1) ^ mul_bytes(0x0d, s2) ^ mul_bytes(0x09, s3);
+  let t1 = mul_bytes(0x09, s0) ^ mul_bytes(0x0e, s1) ^ mul_bytes(0x0b, s2) ^ mul_bytes(0x0d, s3);
+  let t2 = mul_bytes(0x0d, s0) ^ mul_bytes(0x09, s1) ^ mul_bytes(0x0e, s2) ^ mul_bytes(0x0b, s3);
+  let t3 = mul_bytes(0x0b, s0) ^ mul_bytes(0x0d, s1) ^ mul_bytes(0x09, s2) ^ mul_bytes(0x0e, s3);
+  return [t0, t1, t2, t3];
+}
+
+/**
+ * InvMixColumns transformation [FIPS-PUB-197], Section 5.3.3.
+ */
+
+fn inv_mixcolumns ([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15] : Block) -> Block {
+  let [t0 , t1 , t2 , t3 ] = inv_mixcolumns_step([s0 , s1 , s2 , s3 ]);
+  let [t4 , t5 , t6 , t7 ] = inv_mixcolumns_step([s4 , s5 , s6 , s7 ]);
+  let [t8 , t9 , t10, t11] = inv_mixcolumns_step([s8 , s9 , s10, s11]);
+  let [t12, t13, t14, t15] = inv_mixcolumns_step([s12, s13, s14, s15]);
+  return [t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15];
+}
 
 #[cfg(test)]
 mod aes_tests {
@@ -152,6 +199,7 @@ mod aes_tests {
   /**
    * Property demonstrating that Sbox and InvSbox are inverses.
    */
+   
   #[test]
   fn sbox_inverts() {
     for i in 0..=127 {
@@ -162,9 +210,10 @@ mod aes_tests {
   /**
    * Property demonstrating that SubBytes and InvSubBytes are inverses.
    */
+   
   #[test]
   fn subbytes_inverts() {
-    for i in 0..=127 {  // Run 128 random tests of 2^^128 possible tests
+    for _i in 0..=127 {  // Run 128 random tests of 2^^128 possible tests
       let xs : Block = rand::random(); 
       assert_eq!(inv_subbytes(subbytes(xs)), xs);
     }
@@ -174,13 +223,42 @@ mod aes_tests {
    * Property demonstrating that ShiftRows and InvShiftRows are
    * inverses.
    */
+   
   #[test]
   fn shiftrows_inverts() {
-    for i in 0..=127 {  // Run 128 random tests of 2^^128 possible tests
+    for _i in 0..=127 {  // Run 128 random tests of 2^^128 possible tests
       let xs : Block = rand::random(); 
       assert_eq!(inv_shiftrows(shiftrows(xs)), xs);
     }
   }
+
+  /**
+   * Property demonstrating that the step functions of MixColumns and
+   * InvMixColumns are inverses.
+   */
+   
+  #[test]
+  fn mixcolumns_step_inverts() {
+    for _i in 0..=127 {  // Run 128 random tests of 2^^32 possible tests
+      let s : Word = rand::random(); 
+      assert_eq!(inv_mixcolumns_step(mixcolumns_step(s)), s);
+    }
+  }
+
+  /**
+   * Property demonstrating that MixColumns and InvMixColumns are
+   * inverses.
+   */
+
+  #[test]
+  fn mixcolumns_inverts() {
+    for _i in 0..=127 {  // Run 128 random tests of 2^^128 possible tests
+      let xs : Block = rand::random(); 
+      assert_eq!(inv_mixcolumns(mixcolumns(xs)), xs);
+    }
+  }
+
+
 }
 
 fn main() {
