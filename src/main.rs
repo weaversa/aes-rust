@@ -12,6 +12,12 @@ type Block = [u8; 16];
 
 type Word = [u8; 4];
 
+/**
+ * The round constant word array [FIPS-PUB-197], Section 2.1 and
+ * 5.2. Constants are use here rather than computing the values in
+ * place.
+ */
+
 static RCON : [Word; 11] =
        [ [0x00, 0x00, 0x00, 0x00]  // undefined
        , [0x01, 0x00, 0x00, 0x00], [0x02, 0x00, 0x00, 0x00]
