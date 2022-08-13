@@ -99,7 +99,7 @@ static INVSBOX : [u8; 256] =
  */
 
 fn subbytes (xs : Block) -> Block {
-  let mut ret : Block = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+  let mut ret : Block = [0; 16];
   for i in 0..=15 {
     ret[i] = SBOX[xs[i] as usize];
   }
@@ -111,7 +111,7 @@ fn subbytes (xs : Block) -> Block {
  */
 
 fn inv_subbytes (xs : Block) -> Block {
-  let mut ret : Block = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+  let mut ret : Block = [0; 16];
   for i in 0..=15 {
     ret[i] = INVSBOX[xs[i] as usize];
   }
@@ -124,7 +124,7 @@ fn inv_subbytes (xs : Block) -> Block {
 
 fn shiftrows (xs : Block) -> Block {
   static PERM : [usize; 16] = [0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11];
-  let mut ret : Block = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+  let mut ret : Block = [0; 16];
   for i in 0..=15 {
     ret[i] = xs[PERM[i]];
   }
@@ -137,7 +137,7 @@ fn shiftrows (xs : Block) -> Block {
 
 fn inv_shiftrows (xs : Block) -> Block {
   static PERM : [usize; 16] = [0, 13, 10, 7, 4, 1, 14, 11, 8, 5, 2, 15, 12, 9, 6, 3];
-  let mut ret : Block = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+  let mut ret : Block = [0; 16];
   for i in 0..=15 {
     ret[i] = xs[PERM[i]];
   }
@@ -213,6 +213,97 @@ fn inv_round (mut xs : Block, ki : Block) -> Block {
     xs[i] = xs[i] ^ ki[i];
   }
   return inv_subbytes(inv_shiftrows(inv_mixcolumns(xs)));
+}
+
+/**
+ * Takes a four-byte input word and applies the S-box to each of the
+ * four bytes to produce an output word [FIPS-PUB-197], Section 5.2.
+ */
+
+fn subword (w : Word) -> Word {
+  let mut ret = [0, 0, 0, 0];
+  for i in 0..=3 {
+     ret[i] = SBOX[w[i] as usize];
+  }
+  return ret;
+}
+
+/**
+ * Takes a word [a0,a1,a2,a3] as input, performs a cyclic permutation,
+ * and returns the word [a1,a2,a3,a0] [FIPS-PUB-197], Section 5.2.
+ */
+
+fn rotword ([a0, a1, a2, a3] : Word) -> Word {
+  [a1, a2, a3, a0]
+}
+
+fn xorw (mut a : Word, b : Word) -> Word {
+  for i in 0..=3 {
+    a[i] ^= b[i]
+  }
+  return a;
+}
+
+/**
+ * The main AES key expansion routine [FIPS-PUB-197], Section 5.2.
+ */
+
+fn key_expansion (k : [Word; 4]) -> [Block; 11] {
+  let nk = 128 / 32;
+  let nr = nk + 6;
+  let mut w = [[0; 4]; 44];
+  for i in 0..=4 * (nr + 1) - 1 {
+    if i < nk { w[i] = k[i] }
+    else if i % nk == 0 { w[i] = xorw(w[i - nk], xorw(subword(rotword(w[i-1])), RCON[i / nk])) }
+    else if (i % nk == 4) & (nk > 6) { w[i] = xorw(w[i-nk], subword(w[i-1])) }
+    else { w[i] = xorw(w[i-nk], w[i-1]) };
+  }
+  let mut bs = [[0u8; 16]; 11];
+  for i in 0..=10 {
+    for j in 0..=15 {
+      bs[i][j] = w[i * 4 + j / 4][j%4];
+    }
+  }
+  return bs;
+}
+
+fn xorb (mut a : Block, b : Block) -> Block {
+  for i in 0..=15 {
+    a[i] ^= b[i]
+  }
+  return a;
+}
+
+/**
+ * The Cipher function performs AES encryption [FIPS-PUB-197], Section
+ * 5.1.
+ */
+
+pub fn cipher (key : [Word; 4], plaintext : Block) -> Block {
+  let ks  = key_expansion(key);
+  let pre = xorb(plaintext, ks[0]);
+  let mut mid = pre;
+  for i in 1..=9 {
+    mid = round(mid, ks[i]);
+  }
+  let ciphertext = xorb(shiftrows(subbytes(mid)), ks[10]);
+  return ciphertext;
+}
+
+/**
+ * The InvCipher function performs AES decryption [FIPS-PUB-197],
+ * Section 5.1.
+ */
+
+pub fn inv_cipher (key : [Word; 4], ciphertext : Block) -> Block {
+  let ks  = key_expansion(key);
+  let pre = inv_subbytes(inv_shiftrows(xorb(ciphertext, ks[10])));
+  let mut mid = pre;
+  for i in 1..=9 {
+    mid = inv_round(mid, ks[10-i]);
+  }
+  let plaintext = xorb(mid, ks[0]);
+  return plaintext;
 }
 
 #[cfg(test)]
@@ -294,11 +385,42 @@ mod aes_tests {
     }
   }
 
+  /**
+   * Property demonstrating that Cipher and InvCipher are inverses.
+   */
 
+  #[test]
+  fn cipher_inverts() {
+    for _i in 0..=127 {  // Run 128 random tests of 2^^256 possible tests
+      let key   : [Word; 4] = rand::random();
+      let plaintext : Block = rand::random(); 
+      assert_eq!(inv_cipher(key, cipher(key, plaintext)), plaintext);
+    }
+  }
+
+  #[test]
+  fn test_vectors() {
+    let plaintext : Block  = [ 0x00, 0x11, 0x22, 0x33
+                             , 0x44, 0x55, 0x66, 0x77
+                             , 0x88, 0x99, 0xaa, 0xbb
+                             , 0xcc, 0xdd, 0xee, 0xff ];
+    let key : [Word; 4]    = [ [0x00, 0x01, 0x02, 0x03]
+                             , [0x04, 0x05, 0x06, 0x07]
+                             , [0x08, 0x09, 0x0a, 0x0b]
+                             , [0x0c, 0x0d, 0x0e, 0x0f] ];
+    let ciphertext : Block = [ 0x69, 0xc4, 0xe0, 0xd8
+                             , 0x6a, 0x7b, 0x04, 0x30
+                             , 0xd8, 0xcd, 0xb7, 0x80
+                             , 0x70, 0xb4, 0xc5, 0x5a ];
+    assert_eq!(cipher(key, plaintext), ciphertext);
+    assert_eq!(inv_cipher(key, ciphertext), plaintext);
+  }
 }
 
 fn main() {
-  for i in 1..=10 {
-    println!("Hello, world! {}", i);
+  for _i in 0..=1000 {
+    let key   : [Word; 4] = rand::random();
+    let plaintext : Block = rand::random(); 
+    assert_eq!(inv_cipher(key, cipher(key, plaintext)), plaintext);
   }
 }
