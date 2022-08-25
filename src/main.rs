@@ -316,7 +316,7 @@ mod aes_tests {
    
   #[test]
   fn sbox_inverts() {
-    for i in 0..=127 {
+    for i in 0..=255 {
       assert_eq!(INVSBOX[SBOX[i as usize] as usize], i);
     }
   }
@@ -428,7 +428,15 @@ mod aes_kani_proofs {
   #[kani::proof]
   fn sbox_inverts() {
     let i = kani::any();
-    kani::assume(i < 128);
+    
+    kani::assume(i <= 255);
+    /* The above line gives the warning:
+     *   > warning: comparison is useless due to type limits
+     * However, leaving it out gives an error:
+     *   > error: error: conflicting types for variable
+     *     'sbox_inverts::1::var_12'
+     */
+     
     assert_eq!(INVSBOX[SBOX[i as usize] as usize], i);
   }
 
@@ -492,17 +500,124 @@ mod aes_kani_proofs {
 
   #[kani::proof]
   fn cipher_inverts() {
-    let key   : [Word; 4] = kani::any();
-    let plaintext : Block = kani::any();
+    let key       : [Word; 4] = kani::any();
+    let plaintext : Block     = kani::any();
     assert_eq!(inv_cipher(key, cipher(key, plaintext)), plaintext);
   }
 
 }
 
+#[cfg(crux)]
+mod aes_crux_proofs {
+  extern crate crucible;
+  use super::*;
+  use crucible::*;
+
+  /**
+   * Property demonstrating that Sbox and InvSbox are inverses.
+   */
+   
+  #[crux_test]
+  fn sbox_inverts() {
+    let i = u8::symbolic("i");
+    assert_eq!(INVSBOX[SBOX[i as usize] as usize], i);
+  }
+
+  /**
+   * Property demonstrating that SubBytes and InvSubBytes are inverses.
+   */
+   
+  #[crux_test]
+  fn subbytes_inverts() {
+    let mut xs : Block = [0; 16];
+    for i in 0..=15 {
+      let j = u8::symbolic("xs_i");
+      crucible_assume!(INVSBOX[SBOX[j as usize] as usize] == j);
+      xs[i] = j;
+    }
+    assert_eq!(inv_subbytes(subbytes(xs)), xs);
+  }
+
+  /**
+   * Property demonstrating that ShiftRows and InvShiftRows are
+   * inverses.
+   */
+   
+  #[crux_test]
+  fn shiftrows_inverts() {
+    let mut xs : Block = [0; 16];
+    for i in 0..=15 {
+      xs[i] = u8::symbolic("xs_i");
+    }
+    assert_eq!(inv_shiftrows(shiftrows(xs)), xs);
+  }
+
+  /**
+   * Property demonstrating that the step functions of MixColumns and
+   * InvMixColumns are inverses.
+   */
+   
+  #[crux_test]
+  fn mixcolumns_step_inverts() {
+    let mut s : Word = [0; 4];
+    for i in 0..=3 {
+      s[i] = u8::symbolic("s_i");
+    }
+    assert_eq!(inv_mixcolumns_step(mixcolumns_step(s)), s);
+  }
+
+  /**
+   * Property demonstrating that MixColumns and InvMixColumns are
+   * inverses.
+   */
+
+  #[crux_test]
+  fn mixcolumns_inverts() {
+    let mut xs : Block = [0; 16];
+    for i in 0..=15 {
+      xs[i] = u8::symbolic("xs_i");
+    }
+    let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15] : Block = xs;
+    crucible_assume!(
+      inv_mixcolumns_step(mixcolumns_step([s0 , s1 , s2 , s3 ]))
+                                       == [s0 , s1 , s2 , s3 ]);
+    crucible_assume!(
+      inv_mixcolumns_step(mixcolumns_step([s4 , s5 , s6 , s7 ]))
+                                       == [s4 , s5 , s6 , s7 ]);
+    crucible_assume!(
+      inv_mixcolumns_step(mixcolumns_step([s8 , s9 , s10, s11]))
+                                       == [s8 , s9 , s10, s11]);
+    crucible_assume!(
+      inv_mixcolumns_step(mixcolumns_step([s12, s13, s14, s15]))
+                                       == [s12, s13, s14, s15]);
+    assert_eq!(inv_mixcolumns(mixcolumns(xs)), xs);
+  }
+
+  /**
+   * Property demonstrating that Round and InvRound are inverses.
+   */
+
+  #[crux_test]
+  fn round_inverts() {
+    let mut xs : Block = [0; 16];
+    let mut ki : Block = [0; 16];
+    for i in 0..=15 {
+      xs[i] = u8::symbolic("xs_i");
+      ki[i] = u8::symbolic("ki_i");
+    }
+
+    assert_eq!(inv_round(round(xs, ki), ki), xs);
+  }
+
+}
+
 fn main() {
-  for _i in 0..=1000 {
-    //let key   : [Word; 4] = rand::random();
-    //let plaintext : Block = rand::random(); 
-    //assert_eq!(inv_cipher(key, cipher(key, plaintext)), plaintext);
+  for i in 0..=0xffffffffu64 {
+    let s : Word = [ (i     & 0xff) as u8
+                   , (i>> 8 & 0xff) as u8
+                   , (i>>16 & 0xff) as u8
+                   , (i>>24 & 0xff) as u8];
+    assert_eq!(inv_mixcolumns_step(mixcolumns_step(s)), s);
+    if i % 1000000 == 0 { println!("i = {}", i) };
   }
 }
