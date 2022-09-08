@@ -427,16 +427,7 @@ mod aes_kani_proofs {
    
   #[kani::proof]
   fn sbox_inverts() {
-    let i = kani::any();
-    
-    kani::assume(i <= 255);
-    /* The above line gives the warning:
-     *   > warning: comparison is useless due to type limits
-     * However, leaving it out gives an error:
-     *   > error: error: conflicting types for variable
-     *     'sbox_inverts::1::var_12'
-     */
-     
+    let i:u8 = kani::any();
     assert_eq!(INVSBOX[SBOX[i as usize] as usize], i);
   }
 
