@@ -238,18 +238,27 @@ property MixColumnsStepInverts xs = InvMixColumnsStep (MixColumnsStep xs) == xs
 property MixColumnsInverts xs = InvMixColumns (MixColumns xs) == xs
 
 /**
+ * Adds a round key into the current state [FIPS-PUB-197], Section 5.1.
+ */
+
+AddRoundKey : Block_t -> Block_t -> Block_t
+AddRoundKey xs ki = xs ^ ki
+
+property AddRoundKeyInvolution xs ki = AddRoundKey (AddRoundKey xs ki) ki == xs
+
+/**
  * Performs one round of AES encryption [FIPS-PUB-197], Section 5.1.
  */
 
 Round : Block_t -> Block_t -> Block_t
-Round xs ki = MixColumns (ShiftRows (SubBytes xs)) ^ ki
+Round xs ki = AddRoundKey (MixColumns (ShiftRows (SubBytes xs))) ki
 
 /**
  * Performs one round of AES decryption [FIPS-PUB-197], Section 5.3.
  */
 
 InvRound : Block_t -> Block_t -> Block_t
-InvRound xs ki = InvSubBytes (InvShiftRows (InvMixColumns (xs ^ ki)))
+InvRound xs ki = InvSubBytes (InvShiftRows (InvMixColumns (AddRoundKey xs ki)))
 
 /**
  * Property demonstrating that Round and InvRound are inverses.
@@ -266,9 +275,9 @@ Cipher : {k} (Key k) => [k] -> Block_t -> Block_t
 Cipher key plain = cipher
   where
     [k0] # ks # [kr] = KeyExpansion key
-    pre  = plain ^ k0
-    mid  = foldl Round pre ks
-    cipher = ShiftRows (SubBytes mid) ^ kr
+    pre              = AddRoundKey plain k0
+    mid              = foldl Round pre ks
+    cipher           = AddRoundKey (ShiftRows (SubBytes mid)) kr
 
 /**
  * The InvCipher function performs AES decryption [FIPS-PUB-197],
@@ -279,9 +288,9 @@ InvCipher : {k} (Key k) => [k] -> Block_t -> Block_t
 InvCipher key cipher = plain
   where
     [k0] # ks # [kr] = KeyExpansion key
-    pre  = InvSubBytes (InvShiftRows (cipher ^ kr))
-    mid  = foldl InvRound pre (reverse ks)
-    plain = mid ^ k0
+    pre              = InvSubBytes (InvShiftRows (AddRoundKey cipher kr))
+    mid              = foldl InvRound pre (reverse ks)
+    plain            = AddRoundKey mid k0
 
 /**
  * A property demonstrating that Cipher and InvCipher are inverses.
