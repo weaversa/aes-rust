@@ -1,3 +1,5 @@
+enable_experimental;
+
 let use_lemmas lemmas =
     simplify (addsimps lemmas (cryptol_ss()));
 
@@ -21,11 +23,12 @@ MixColumnsStepInverts_lemma <-
 
 print "Proving MixColumnsInverts...";
 MixColumnsInverts_lemma <-
-    time (prove_print z3 {{ \xs -> InvMixColumns (MixColumns xs) == xs }});
-
-print "Proving xor inverts...";
-xorInverts_lemma <-
-    time (prove_print z3 {{ \(xs : Block_t) ki -> (xs ^ ki) ^ ki == xs }});
+    time (prove_print do {
+        unfolding ["InvMixColumns", "MixColumns"];
+        goal_normalize ["InvMixColumnsStep", "MixColumnsStep"];
+        use_lemmas [ MixColumnsStepInverts_lemma ];
+        z3;
+    } {{ \xs -> InvMixColumns (MixColumns xs) == xs }});
 
 print "Proving AddRoundKey is an involution...";
 AddRoundKeyInvolution_lemma <-
@@ -43,15 +46,15 @@ RoundInverts_lemma <-
         z3;
     } {{ \xs ki -> InvRound (Round xs ki) ki == xs }});
 
-print "Proving CipherInverts...";
+print "Proving CipherInverts 128...";
 CipherInverts_lemma <-
     time (prove_print do {
-        unfolding ["InvCipher", "Cipher", "foldl"];
+        unfolding ["InvCipher", "Cipher", "ecFoldl"];
         use_lemmas [ AddRoundKeyInvolution_lemma
                    , SubBytesInverts_lemma
                    , ShiftRowsInverts_lemma
-                   , RoundInverts_lemma
                    ];
-        print_goal;
+        goal_normalize ["InvRound", "Round", "KeyExpansion"];
+        use_lemmas [ RoundInverts_lemma ];
         unint_z3 ["KeyExpansion"];
     } {{ \(key : [128]) plain -> InvCipher key (Cipher key plain) == plain }});
