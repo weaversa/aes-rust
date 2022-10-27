@@ -19,7 +19,7 @@ SubBytesInverts_lemma <- proveit {{ SubBytesInverts }} yices;
 
 ShiftRowsInverts_lemma <- proveit {{ ShiftRowsInverts }} z3;
 
-MixColumnsStepInverts_lemma <- proveit {{ MixColumnsStepInverts}} z3;
+MixColumnsStepInverts_lemma <- proveit {{ MixColumnsStepInverts }} z3;
 
 MixColumnsInverts_lemma <- proveit {{ MixColumnsInverts }}
   do {
@@ -41,10 +41,12 @@ RoundInverts_lemma <- proveit {{ RoundInverts }}
                ];
     z3;
   };
-  
-CipherInverts_128_lemma <- proveit {{ CipherInverts`{128} }}
+
+print "Proving CipherInverts_128";
+
+CipherInverts_128_lemma <- time (prove_print
   do {
-    unfolding ["InvCipher", "Cipher", "ecFoldl"];
+    unfolding ["CipherInverts", "InvCipher", "Cipher", "ecFoldl"];
     use_lemmas [ AddRoundKeyInvolution_lemma
                , SubBytesInverts_lemma
                , ShiftRowsInverts_lemma
@@ -52,4 +54,4 @@ CipherInverts_128_lemma <- proveit {{ CipherInverts`{128} }}
     goal_normalize ["InvRound", "Round", "KeyExpansion"];
     use_lemmas [ RoundInverts_lemma ];
     unint_z3 ["KeyExpansion"];
-  };
+  } {{ CipherInverts`{128} }});

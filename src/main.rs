@@ -157,18 +157,6 @@ fn mixcolumns_step ([s0, s1, s2, s3] : Word) -> Word {
 }
 
 /**
- * MixColumns transformation [FIPS-PUB-197], Section 5.1.3.
- */
-
-fn mixcolumns ([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15] : Block) -> Block {
-  let [t0 , t1 , t2 , t3 ] = mixcolumns_step([s0 , s1 , s2 , s3 ]);
-  let [t4 , t5 , t6 , t7 ] = mixcolumns_step([s4 , s5 , s6 , s7 ]);
-  let [t8 , t9 , t10, t11] = mixcolumns_step([s8 , s9 , s10, s11]);
-  let [t12, t13, t14, t15] = mixcolumns_step([s12, s13, s14, s15]);
-  return [t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15];
-}
-
-/**
  * One step of InvMixColumns [FIPS-PUB-197], Section 5.3.3.
  */
 
@@ -178,6 +166,18 @@ fn inv_mixcolumns_step ([s0, s1, s2, s3] : Word) -> Word {
   let t2 = mul_bytes(0x0d, s0) ^ mul_bytes(0x09, s1) ^ mul_bytes(0x0e, s2) ^ mul_bytes(0x0b, s3);
   let t3 = mul_bytes(0x0b, s0) ^ mul_bytes(0x0d, s1) ^ mul_bytes(0x09, s2) ^ mul_bytes(0x0e, s3);
   return [t0, t1, t2, t3];
+}
+
+/**
+ * MixColumns transformation [FIPS-PUB-197], Section 5.1.3.
+ */
+
+fn mixcolumns ([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15] : Block) -> Block {
+  let [t0 , t1 , t2 , t3 ] = mixcolumns_step([s0 , s1 , s2 , s3 ]);
+  let [t4 , t5 , t6 , t7 ] = mixcolumns_step([s4 , s5 , s6 , s7 ]);
+  let [t8 , t9 , t10, t11] = mixcolumns_step([s8 , s9 , s10, s11]);
+  let [t12, t13, t14, t15] = mixcolumns_step([s12, s13, s14, s15]);
+  return [t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15];
 }
 
 /**
