@@ -1,5 +1,5 @@
 - name: Kani Rust Verifier
 
-on: [push, pull_request]
+on: [push]
 
 uses: model-checking/kani-github-action@v0.13
