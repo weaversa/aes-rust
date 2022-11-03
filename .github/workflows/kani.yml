@@ -10,12 +10,26 @@ jobs:
         uses: actions/checkout@v2
       - name: Kani Rust Verifier
         uses: model-checking/kani-github-action@v0.13
+
   run-kani-terse:
-    runs-on: ubuntu-latest
+    using: "composite"
     steps:
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1.0.7
+        with:
+          toolchain: nightly-2022-10-11
+          override: true
+
+      - name: Install Kani
+        shell: bash
+        run: |
+          export KANI_VERSION="0.13.0";
+          cargo install --version $KANI_VERSION --locked kani-verifier;
+          cargo-kani setup;
+
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Kani Rust Verifier
-        run: cargo install --locked kani-verifier
-      - run: cargo-kani setup
-      - run: cargo kani --output-format=terse
+
+      - name: Kani terse
+        shell: bash
+        run: cargo kani --output-format=terse
