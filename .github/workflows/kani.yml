@@ -12,7 +12,6 @@ jobs:
         uses: model-checking/kani-github-action@v0.13
 
   run-kani-terse:
-    using: "composite"
     steps:
       - name: Install Rust
         uses: actions-rs/toolchain@v1.0.7
