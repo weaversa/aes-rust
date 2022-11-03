@@ -3,10 +3,19 @@ name: Proofs
 on: [push, pull_request]
 
 jobs:
-  run-kani:
+  run-kani-action:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Kani Rust Verifier
         uses: model-checking/kani-github-action@v0.13
+  run-kani-terse:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Kani Rust Verifier
+        run: cargo install --locked kani-verifier
+        run: cargo-kani setup
+        run: cargo kani --output-format=terse
