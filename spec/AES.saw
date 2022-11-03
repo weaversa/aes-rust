@@ -3,12 +3,10 @@ enable_experimental;
 let use_lemmas lemmas =
     simplify (addsimps lemmas (cryptol_ss()));
 
-let property p = unfold_term [show_term p] p;
-
 let proveit p script =
   do {
     print (str_concat "Proving " (show_term p));
-    time (prove_print script (property p));
+    time (prove_print script p);
   };
 
 import "AES.cry";
@@ -23,7 +21,7 @@ MixColumnsStepInverts_lemma <- proveit {{ MixColumnsStepInverts }} z3;
 
 MixColumnsInverts_lemma <- proveit {{ MixColumnsInverts }}
   do {
-    unfolding ["InvMixColumns", "MixColumns"];
+    unfolding ["MixColumnsInverts", "InvMixColumns", "MixColumns"];
     goal_normalize ["InvMixColumnsStep", "MixColumnsStep"];
     use_lemmas [ MixColumnsStepInverts_lemma ];
     z3;
@@ -33,7 +31,7 @@ AddRoundKeyInvolution_lemma <- proveit {{ AddRoundKeyInvolution }} z3;
 
 RoundInverts_lemma <- proveit {{ RoundInverts }}
   do {
-    unfolding ["InvRound", "Round"];
+    unfolding ["RoundInverts", "InvRound", "Round"];
     use_lemmas [ AddRoundKeyInvolution_lemma
                , SubBytesInverts_lemma
                , ShiftRowsInverts_lemma
@@ -44,7 +42,7 @@ RoundInverts_lemma <- proveit {{ RoundInverts }}
 
 print "Proving CipherInverts_128";
 
-CipherInverts_128_lemma <- time (prove_print
+CipherInverts_128_lemma <- proveit {{ CipherInverts`{128} }}
   do {
     unfolding ["CipherInverts", "InvCipher", "Cipher", "ecFoldl"];
     use_lemmas [ AddRoundKeyInvolution_lemma
@@ -54,4 +52,4 @@ CipherInverts_128_lemma <- time (prove_print
     goal_normalize ["InvRound", "Round", "KeyExpansion"];
     use_lemmas [ RoundInverts_lemma ];
     unint_z3 ["KeyExpansion"];
-  } {{ CipherInverts`{128} }});
+  };
