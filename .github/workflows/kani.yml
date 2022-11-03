@@ -16,6 +16,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Kani Rust Verifier
-      - run: cargo install --locked kani-verifier
+        run: cargo install --locked kani-verifier
       - run: cargo-kani setup
       - run: cargo kani --output-format=terse
